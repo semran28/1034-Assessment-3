@@ -14,16 +14,32 @@ def load_graph(args):
     Returns:
     A dict mapling a URL (str) to a list of target URLs (str).
     """
+    graph={}
+
     # Iterate through the file line by line
     for line in args.datafile:
-        # And split each line into two URLs
-        node, target = line.split()
-        raise RuntimeError("This function is not implemented yet.")
-
+        # And split each line into two URLs   
+        source, target =line.strip().split()
+          
+           # Add source to graph if it is not present
+        if source not in graph:
+            graph[source]=[]
+            
+        graph[source].append(target)
+        # Ensures target URL also exists in dictioanry    
+        if target not in graph:
+                 graph[target]=[]
+    
+    return graph
 
 def print_stats(graph):
-        """Print number of nodes and edges in the given graph"""
-        raise RuntimeError("This function is not implemented yet.")
+    """Print number of nodes and edges in graph"""
+    # Count nodes
+    num_nodes = len(graph)
+    # Count edges
+    num_edges = sum(len(targets) for targets in graph.values())
+    # Print the stats
+    print(f"Graph contains {num_nodes} nodes and {num_edges} edges.")
 
 
 def stochastic_page_rank(graph, args):
