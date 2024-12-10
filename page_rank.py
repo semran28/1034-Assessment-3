@@ -2,6 +2,7 @@ import sys
 import os
 import time
 import argparse
+import random
 from progress import Progress
 
 
@@ -50,13 +51,35 @@ def stochastic_page_rank(graph, args):
     args -- arguments named tuple
 
     Returns:
-    A dict that assigns each page its hit frequency
+    A dict that assigns each page its hit frequency."""
 
-    This function estimates the Page Rank by counting how frequently
-    a random walk that starts on a random node will after n_steps end
-    on each node of the given graph.
-    """
-    raise RuntimeError("This function is not implemented yet.")
+    # Initial visit counts for each node:
+    visit_counts= {node:0 for node in graph}
+
+    # Random n_steps taken
+    for _ in range(args.repeats):
+         # Start point at a random node
+         current_node = random.choice(list(graph.keys()))
+
+         for _ in range(args.steps):
+              
+              # Increase visit count on the node walker lands in.
+              visit_counts[current_node] += 1
+              # Get outgoing links from current node
+              neighbors= graph[current_node]
+
+              # Restart from a random node if current node contains no outgoing links 
+              if not neighbors:
+                 current_node = random.choice(list(graph.keys()))
+
+              else: current_node = random.choice(neighbors) 
+
+    # Calculate probability
+    total_visits = args.repeats * args.steps
+    page_rank = {node: count / total_visits for node, count in visit_counts.items()}
+
+    return page_rank
+
 
 
 def distribution_page_rank(graph, args):
@@ -95,10 +118,13 @@ if __name__ == '__main__':
 
     start = time.time()
     ranking = algorithm(graph, args)
+   
     stop = time.time()
     time = stop - start
+
 
     top = sorted(ranking.items(), key=lambda item: item[1], reverse=True)
     sys.stderr.write(f"Top {args.number} pages:\n")
     print('\n'.join(f'{100*v:.2f}\t{k}' for k,v in top[:args.number]))
     sys.stderr.write(f"Calculation took {time:.2f} seconds.\n")
+
