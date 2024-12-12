@@ -4,7 +4,7 @@ import time
 import argparse
 import random
 from progress import Progress
-
+import numpy as np
 
 
 class Graph:
@@ -73,12 +73,17 @@ class Graph:
         self.nodes = list(self.graph.keys())
         index_map = {node: i for i, node in enumerate(self.nodes)}
         size = len(self.nodes)
-        matrix = [[0] * size for _ in range(size)]
+        matrix = np.zeros((size, size))
 
         for source, targets in self.graph.items():
             for target in targets:
-                matrix[index_map[source]][index_map[target]] = 1
+                matrix[index_map[source], index_map[target]] = 1
 
+        for i in range(size):
+            col_sum = matrix[:, i].sum()
+            if col_sum > 0:
+                matrix[:, i] /= col_sum
+        
         return matrix, self.nodes
 
     def to_weighted_adjacency_list(self):
@@ -113,36 +118,25 @@ def stochastic_page_rank(graph, n_repetitions):
 
     return hit_count
 
-def distribution_page_rank(graph, n_steps):
+def distribution_page_rank(matrix, nodes, n_steps):
     """
-    Distribution-based PageRank estimation using adjacency list.
+    Optimized PageRank using adjacency matrix representation and NumPy.
 
     Parameters:
-        graph (dict): Adjacency list representation of the graph.
-        n_steps (int): Number of iterations for convergence.
+        matrix (numpy.ndarray): Adjacency matrix.
+        nodes (list): List of nodes.
+        n_steps (int): Number of iterations.
 
     Returns:
-        dict: Dictionary mapping nodes to their PageRank scores.
+        dict: PageRank values for each node.
     """
-    num_nodes = len(graph)
-    node_prob = {node: 1 / num_nodes for node in graph}  # Initial uniform probability
+    num_nodes = len(nodes)
+    rank = np.ones(num_nodes) / num_nodes
 
     for _ in range(n_steps):
-        next_prob = {node: 0 for node in graph}
+        rank = matrix @ rank
 
-        for node, edges in graph.items():
-            if edges:  # Nodes with outgoing edges
-                p = node_prob[node] / len(edges)
-                for target in edges:
-                    next_prob[target] += p
-            else:  # Nodes without outgoing edges (distribute uniformly)
-                p = node_prob[node] / num_nodes
-                for target in graph:
-                    next_prob[target] += p
-
-        node_prob = next_prob
-
-    return node_prob
+    return {nodes[i]: rank[i] for i in range(num_nodes)}
 
 
 def stochastic_page_rank_edge_list(edge_list, n_steps, nodes):
@@ -160,24 +154,6 @@ def stochastic_page_rank_edge_list(edge_list, n_steps, nodes):
         hit_count[current_node] += 1
     return hit_count
 
-
-def distribution_page_rank_matrix(matrix, nodes, n_steps):
-    """PageRank using adjacency matrix representation."""
-    num_nodes = len(nodes)
-    node_prob = [1 / num_nodes] * num_nodes
-    for _ in range(n_steps):
-        next_prob = [0] * num_nodes
-        for i in range(num_nodes):
-            row_sum = sum(matrix[i])
-            if row_sum == 0:
-                for j in range(num_nodes):
-                    next_prob[j] += node_prob[i] / num_nodes
-            else:
-                for j in range(num_nodes):
-                    if matrix[i][j] == 1:
-                        next_prob[j] += node_prob[i] / row_sum
-        node_prob = next_prob
-    return {nodes[i]: prob for i, prob in enumerate(node_prob)}
 
 parser = argparse.ArgumentParser(description="Estimates PageRanks from link information.")
 parser.add_argument("datafile", nargs="?", type=argparse.FileType("r"), default=sys.stdin,
@@ -217,7 +193,8 @@ if __name__ == '__main__':
 
     elif args.representation == "matrix" and args.method == "distribution":
         matrix, nodes = graph.to_matrix()
-        ranking = distribution_page_rank_matrix(matrix, nodes, args.steps)
+        ranking = distribution_page_rank(matrix, nodes, args.steps)
+
 
     elif args.representation == "weighted_adjacency_list":
         ranking = graph.to_weighted_adjacency_list()
