@@ -26,7 +26,7 @@ class Graph:
             if target not in self.graph:
                 self.graph[target] = []
         
-        # Convert graph to desired representation
+        # Conversion of graph to desired representation
         if self.representation == "adjacency_list":
             return self.graph
         elif self.representation == "weighted_adjacency_list":
@@ -39,6 +39,23 @@ class Graph:
             return self.to_edge_list()
         else:
             raise ValueError(f"Unknown representation type: {self.representation}")
+        
+    def print_stats(self):
+        """ Print number of nodes and edges in the given graph"""
+        if isinstance(self.graph, dict):  # Adjacency list
+            num_nodes = len(self.graph)
+            num_edges = sum(len(targets) for targets in self.graph.values())
+        elif isinstance(self.graph, list) and isinstance(self.graph[0], tuple):  # Edge list
+            num_nodes = len({node for edge in self.graph for node in edge})
+            num_edges = len(self.graph)
+        elif isinstance(self.graph, tuple):  # Matrix
+            matrix, nodes = self.graph
+            num_nodes = len(nodes)
+            num_edges = sum(sum(row) for row in matrix)
+        else:
+            raise ValueError("Unknown graph representation type.")
+
+        print(f"Graph contains {num_nodes} nodes and {num_edges} edges.")
 
 
 
