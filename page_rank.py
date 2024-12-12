@@ -6,6 +6,7 @@ import random
 from progress import Progress
 
 
+
 class Graph:
     def __init__(self, representation="adjacency_list"):
         """Initialise graph object"""
@@ -88,6 +89,62 @@ class Graph:
         }
         return weighted_graph
 
+def stochastic_page_rank(graph, n_repetitions):
+    """
+    Stochastic PageRank estimation using adjacency list.
+
+    Parameters:
+        graph (dict): Adjacency list representation of the graph.
+        n_repetitions (int): Number of repetitions for random walker.
+
+    Returns:
+        dict: Dictionary mapping nodes to their hit frequency.
+    """
+    hit_count = {node: 0 for node in graph}
+    current_node = random.choice(list(graph.keys()))
+    hit_count[current_node] += 1
+
+    for _ in range(n_repetitions):
+        if not graph[current_node]:  # No outgoing edges
+            current_node = random.choice(list(graph.keys()))
+        else:
+            current_node = random.choice(graph[current_node])
+        hit_count[current_node] += 1
+
+    return hit_count
+
+def distribution_page_rank(graph, n_steps):
+    """
+    Distribution-based PageRank estimation using adjacency list.
+
+    Parameters:
+        graph (dict): Adjacency list representation of the graph.
+        n_steps (int): Number of iterations for convergence.
+
+    Returns:
+        dict: Dictionary mapping nodes to their PageRank scores.
+    """
+    num_nodes = len(graph)
+    node_prob = {node: 1 / num_nodes for node in graph}  # Initial uniform probability
+
+    for _ in range(n_steps):
+        next_prob = {node: 0 for node in graph}
+
+        for node, edges in graph.items():
+            if edges:  # Nodes with outgoing edges
+                p = node_prob[node] / len(edges)
+                for target in edges:
+                    next_prob[target] += p
+            else:  # Nodes without outgoing edges (distribute uniformly)
+                p = node_prob[node] / num_nodes
+                for target in graph:
+                    next_prob[target] += p
+
+        node_prob = next_prob
+
+    return node_prob
+
+
 def stochastic_page_rank_edge_list(edge_list, n_steps, nodes):
     """Random walker estimation using edge list representation."""
     hit_count = {node: 0 for node in nodes}
@@ -122,7 +179,74 @@ def distribution_page_rank_matrix(matrix, nodes, n_steps):
         node_prob = next_prob
     return {nodes[i]: prob for i, prob in enumerate(node_prob)}
 
+parser = argparse.ArgumentParser(description="Estimates PageRanks from link information.")
+parser.add_argument("datafile", nargs="?", type=argparse.FileType("r"), default=sys.stdin,
+                    help="Text file of links among web pages.")
+parser.add_argument("-m", "--method", choices=["stochastic", "distribution"], default="stochastic",
+                    help="Selected PageRank algorithm.")
+parser.add_argument("-r", "--repeats", type=int, default=1_000_000, help="Number of repetitions for stochastic method.")
+parser.add_argument("-s", "--steps", type=int, default=100, help="Number of steps for distribution method.")
+parser.add_argument("-n", "--number", type=int, default=20, help="Number of results to display.")
+parser.add_argument("-g", "--representation", choices=["adjacency_list", "edge_list", "matrix", "weighted_adjacency_list"],
+                    default="adjacency_list", help="Graph representation to use.")
 
+if __name__ == '__main__':
+    args = parser.parse_args()
+
+    # Initialize the Graph class
+    graph = Graph(representation=args.representation)
+
+    # Load the graph
+    graph.load_graph(args.datafile, weights={
+        ("A", "B"): 3,
+        ("A", "C"): 1,
+        ("B", "C"): 2,
+        ("C", "A"): 4
+    } if args.representation == "weighted_adjacency_list" else None)
+
+    # Print graph statistics
+    graph.print_stats()
+
+    start = time.time()
+
+    # Handle PageRank based on representation
+    if args.representation == "edge_list" and args.method == "stochastic":
+        edge_list = graph.to_edge_list()
+        nodes = list(set([node for edge in edge_list for node in edge]))
+        ranking = stochastic_page_rank_edge_list(edge_list, args.repeats, nodes)
+
+    elif args.representation == "matrix" and args.method == "distribution":
+        matrix, nodes = graph.to_matrix()
+        ranking = distribution_page_rank_matrix(matrix, nodes, args.steps)
+
+    elif args.representation == "weighted_adjacency_list":
+        ranking = graph.to_weighted_adjacency_list()
+        ranking = sorted(ranking.items(), key=lambda item: sum(item[1].values()), reverse=True)
+
+    else:  # Default adjacency list logic
+        algorithm = distribution_page_rank if args.method == 'distribution' else stochastic_page_rank
+        ranking = algorithm(graph.graph, args.steps if args.method == 'distribution' else args.repeats)
+
+    stop = time.time()
+    time_taken = stop - start
+
+    # Output results
+    if isinstance(ranking, dict):
+        top = sorted(ranking.items(), key=lambda item: item[1], reverse=True)[:args.number]
+        print(f"Top {args.number} pages:")
+        for node, value in top:
+            print(f"{node}: {value:.6f}")
+    elif isinstance(ranking, list):  # Handle weighted adjacency list case
+        top = ranking[:args.number]
+        print(f"Top {args.number} pages by total weight:")
+        for node, weight_dict in top:
+            total_weight = sum(weight_dict.values())
+            print(f"{node}: {total_weight:.6f}")
+    else:
+        raise TypeError(f"Unexpected ranking type: {type(ranking)}")
+    
+    # Print calculation time
+    print(f"Calculation took {time_taken:.2f} seconds.")
 
 
 
