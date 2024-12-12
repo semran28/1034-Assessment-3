@@ -13,11 +13,10 @@ class Graph:
         self.graph = None
         self.nodes = None
         self.weights = None
-    def load_graph(self, datalife, weights=None):
+    def load_graph(self, datafile, weights=None):
         """Load graph from text file"""
         self.graph = {}
         self.weights = weights
-
         for line in datafile:
             source, target = line.strip().split()
             if source not in self.graph:
@@ -57,18 +56,18 @@ class Graph:
 
         print(f"Graph contains {num_nodes} nodes and {num_edges} edges.")
 
-def to_edge_list(self):
+    def to_edge_list(self):
         """
         Conversion of the default graph to an edge list representation.
         """
         edge_list = []
-        for source, targets in graph.items():
+        for source, targets in self.graph.items():
             for target in targets:
                 edge_list.append((source, target))
 
         return edge_list
 
-def to_matrix(self):
+    def to_matrix(self):
         """Converting the graph to an adjacency matrix representation."""
         self.nodes = list(self.graph.keys())
         index_map = {node: i for i, node in enumerate(self.nodes)}
@@ -81,14 +80,48 @@ def to_matrix(self):
 
         return matrix, self.nodes
 
-
-def to_weighted_adjacency_list(self):
+    def to_weighted_adjacency_list(self):
         """ Convert the graph to a weighted adjacency list."""
         weighted_graph = {
             source: {target: self.weights.get((source, target), 1) for target in targets}
             for source, targets in self.graph.items()
         }
         return weighted_graph
+
+def stochastic_page_rank_edge_list(edge_list, n_steps, nodes):
+    """Random walker estimation using edge list representation."""
+    hit_count = {node: 0 for node in nodes}
+    current_node = random.choice(nodes)
+    hit_count[current_node] += 1
+
+    for _ in range(n_steps):
+        outgoing_edges = [(source, target) for source, target in edge_list if source == current_node]
+        if not outgoing_edges:
+            current_node = random.choice(nodes)
+        else:
+            _, current_node = random.choice(outgoing_edges)
+        hit_count[current_node] += 1
+    return hit_count
+
+
+def distribution_page_rank_matrix(matrix, nodes, n_steps):
+    """PageRank using adjacency matrix representation."""
+    num_nodes = len(nodes)
+    node_prob = [1 / num_nodes] * num_nodes
+    for _ in range(n_steps):
+        next_prob = [0] * num_nodes
+        for i in range(num_nodes):
+            row_sum = sum(matrix[i])
+            if row_sum == 0:
+                for j in range(num_nodes):
+                    next_prob[j] += node_prob[i] / num_nodes
+            else:
+                for j in range(num_nodes):
+                    if matrix[i][j] == 1:
+                        next_prob[j] += node_prob[i] / row_sum
+        node_prob = next_prob
+    return {nodes[i]: prob for i, prob in enumerate(node_prob)}
+
 
 
 
