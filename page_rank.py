@@ -68,7 +68,27 @@ def to_edge_list(self):
 
         return edge_list
 
+def to_matrix(self):
+        """Converting the graph to an adjacency matrix representation."""
+        self.nodes = list(self.graph.keys())
+        index_map = {node: i for i, node in enumerate(self.nodes)}
+        size = len(self.nodes)
+        matrix = [[0] * size for _ in range(size)]
 
+        for source, targets in self.graph.items():
+            for target in targets:
+                matrix[index_map[source]][index_map[target]] = 1
+
+        return matrix, self.nodes
+
+
+def to_weighted_adjacency_list(self):
+        """ Convert the graph to a weighted adjacency list."""
+        weighted_graph = {
+            source: {target: self.weights.get((source, target), 1) for target in targets}
+            for source, targets in self.graph.items()
+        }
+        return weighted_graph
 
 
 
