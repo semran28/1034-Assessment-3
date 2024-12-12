@@ -57,7 +57,16 @@ class Graph:
 
         print(f"Graph contains {num_nodes} nodes and {num_edges} edges.")
 
+def to_edge_list(self):
+        """
+        Conversion of the default graph to an edge list representation.
+        """
+        edge_list = []
+        for source, targets in graph.items():
+            for target in targets:
+                edge_list.append((source, target))
 
+        return edge_list
 
 
 
