@@ -7,6 +7,7 @@ from progress import Progress
 import numpy as np
 
 
+
 class Graph:
     def __init__(self, representation="adjacency_list"):
         """Initialise graph object"""
@@ -14,24 +15,26 @@ class Graph:
         self.graph = None
         self.nodes = None
         self.weights = None
+    
     def load_graph(self, datafile, weights=None):
         """Load graph from text file"""
         self.graph = {}
-        self.weights = weights
+        self.weights = weights if weights is not None else {} 
         for line in datafile:
             source, target = line.strip().split()
+            
             if source not in self.graph:
                 self.graph[source] = []
             self.graph[source].append(target)
             if target not in self.graph:
                 self.graph[target] = []
         
+
         # Conversion of graph to desired representation
         if self.representation == "adjacency_list":
             return self.graph
         elif self.representation == "weighted_adjacency_list":
-            if weights is None:
-                raise ValueError("Weights are required for weighted adjacency list.")
+            self.weights[(source, target)] = 1 # default weight of 1 for each edge
             return self.to_weighted_adjacency_list()
         elif self.representation == "matrix":
             return self.to_matrix()
@@ -55,7 +58,7 @@ class Graph:
         else:
             raise ValueError("Unknown graph representation type.")
 
-        print(f"Graph contains {num_nodes} nodes and {num_edges} edges.")
+        print(f"Graph contains: {num_nodes} nodes and {num_edges} edges.")
 
     def to_edge_list(self):
         """
@@ -91,8 +94,10 @@ class Graph:
         weighted_graph = {
             source: {target: self.weights.get((source, target), 1) for target in targets}
             for source, targets in self.graph.items()
-        }
+    }
         return weighted_graph
+    
+
 
 def stochastic_page_rank(graph, n_repetitions):
     """
@@ -105,10 +110,12 @@ def stochastic_page_rank(graph, n_repetitions):
     Returns:
         dict: Dictionary mapping nodes to their hit frequency.
     """
+    # Initialise hit counts for nodes
     hit_count = {node: 0 for node in graph}
     current_node = random.choice(list(graph.keys()))
     hit_count[current_node] += 1
-
+    
+    # Start random walks 
     for _ in range(n_repetitions):
         if not graph[current_node]:  # No outgoing edges
             current_node = random.choice(list(graph.keys()))
@@ -118,7 +125,7 @@ def stochastic_page_rank(graph, n_repetitions):
 
     return hit_count
 
-def distribution_page_rank(matrix, nodes, n_steps):
+def distribution_page_rank(matrix, nodes, n_steps, tol=1e-6):
     """
     Optimized PageRank using adjacency matrix representation and NumPy.
 
@@ -134,24 +141,39 @@ def distribution_page_rank(matrix, nodes, n_steps):
     rank = np.ones(num_nodes) / num_nodes
 
     for _ in range(n_steps):
-        rank = matrix @ rank
-
+        new_rank = matrix @ rank
+        if np.linalg.norm(new_rank - rank, ord=1) < tol:
+            break
+       
+    rank = new_rank
     return {nodes[i]: rank[i] for i in range(num_nodes)}
 
 
 def stochastic_page_rank_edge_list(edge_list, n_steps, nodes):
     """Random walker estimation using edge list representation."""
     hit_count = {node: 0 for node in nodes}
-    current_node = random.choice(nodes)
+
+    edge_dict = {}
+    for source, target in edge_list:
+        if source not in edge_dict:
+            edge_dict[source] = []
+        edge_dict[source].append(target)
+
+    current_node = np.random.choice(nodes)  # Use NumPy random selection
     hit_count[current_node] += 1
 
+     # Perform random walks
     for _ in range(n_steps):
-        outgoing_edges = [(source, target) for source, target in edge_list if source == current_node]
+        outgoing_edges = edge_dict.get(current_node, [])
+
         if not outgoing_edges:
-            current_node = random.choice(nodes)
+            current_node = np.random.choice(nodes)  # Jump to a random node
         else:
-            _, current_node = random.choice(outgoing_edges)
+            # Follow a random outgoing edge
+            current_node = np.random.choice(outgoing_edges)
+
         hit_count[current_node] += 1
+
     return hit_count
 
 
@@ -172,15 +194,15 @@ if __name__ == '__main__':
     # Initialize the Graph class
     graph = Graph(representation=args.representation)
 
-    # Load the graph
-    graph.load_graph(args.datafile, weights={
-        ("A", "B"): 3,
-        ("A", "C"): 1,
-        ("B", "C"): 2,
-        ("C", "A"): 4
-    } if args.representation == "weighted_adjacency_list" else None)
-
+    # Load the graph  
+    if args.representation == "weighted_adjacency_list": 
+        graph.load_graph(args.datafile)
+        ranking = graph.to_weighted_adjacency_list()
+        ranking = sorted(ranking.items(), key=lambda item: sum(item[1].values()), reverse=True)
+    else:
+        graph.load_graph(args.datafile)
     # Print graph statistics
+    
     graph.print_stats()
 
     start = time.time()
@@ -201,8 +223,11 @@ if __name__ == '__main__':
         ranking = sorted(ranking.items(), key=lambda item: sum(item[1].values()), reverse=True)
 
     else:  # Default adjacency list logic
-        algorithm = distribution_page_rank if args.method == 'distribution' else stochastic_page_rank
-        ranking = algorithm(graph.graph, args.steps if args.method == 'distribution' else args.repeats)
+        if args.method == 'distribution':
+            matrix, nodes = graph.to_matrix()  # Convert adjacency list to matrix
+            ranking = distribution_page_rank(matrix, nodes, args.steps)  
+        else:  # Stochastic method
+            ranking = stochastic_page_rank(graph.graph, args.repeats)
 
     stop = time.time()
     time_taken = stop - start
